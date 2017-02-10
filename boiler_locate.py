@@ -29,25 +29,30 @@ displayThreshold = False
 ### END GLOBALS ###
 ### CONSTANTS ###
 # Camera's physical height (inches) above ground
-cameraAltitude = 14
+cameraAltitude = 24
 
 # Camera's Angle (degrees) above horizontal
-cameraAngle = 2.5
+cameraAngle = 30
 
 # Height of center of target (inches) above ground
-targetAltitude = 13.25
+targetAltitude = 83
 
-# Difference between camera height and target height, useful for the trig.
+# Difference between camera hieght and target height, useful for the trig.
 deltaAltitude = targetAltitude - cameraAltitude
 
-# horizontal size (inches) of vision target.
-targetWidth = 2
-
 # vertical size (inches) of vision target.
-targetHeight = 5
+targetHeight = 6
 
-# Size from one target to the other, for 2 contour sensing
-targetDist = 10.25
+# angle function values
+#angleFunc1A = -90.535724570955
+#angleFunc1B = 45.247456281206
+#angleFunc2A = -5.511621418651
+#angleFunc2B = 24.318446167847
+# distance function values
+estimateDistanceSlope = 0.08748759788249
+estimateDistanceIntercept = -0.5189968934245
+#distFunc2A = -0.1414458147376
+#distFunc2B = -0.0675841969269
 
 ### END CONSTANTS ###
 ### CALIBRATION ###
@@ -58,7 +63,7 @@ cameraMatrix = np.float32([[1.12033194e+03, 0.0, 6.49786694e+02],
                            [0.0, 0.0, 1.0]])
 cameraDistortion = np.float32([0.15190902, -0.78835469, 0.00402702, -0.00291226, -1.00032999])
 # color calibration
-calibrationTuple = ((62, 144, 44), (82, 255, 146), (44, 76, 0), (90, 166, 22))
+calibrationTuple = ((62, 144, 44), (82, 255, 146), (32, 100, 0), (54, 146, 0))
 
 calLowHSV, calHighHSV, calLowBGR, calHighBGR = calibrationTuple
 
@@ -154,39 +159,37 @@ def pixelsToInches(inputPixels, refPixels, refInches):
 
 def simplifyContour(contour):
 
-    out = [None] * len(contour)
-
-    for i in xrange(len(contour)):
-        before = (contour[len(contour)-1][0] if i==0 else contour[i-1][0])
-        point = contour[i][0]
-        after = (contour[0][0] if i == len(contour)-1 else contour[i+1][0])
-
-        angle = calculateAngle(before, point, after)
-        out[i] = contour[i][0].tolist() if angle < 90 else None
-
-    def remFunc(item):
-        return not item is None
-
-    out = filter(remFunc, out)
-
-    # copy out
-    cout = list(out)
-
-    # remove similar points
-    # TODO: rewrite this to be more intelligent
-    for i in xrange(len(out)):
-        if i == 0:
-            continue;
-
-        oy,ox = out[i-1]
-        y,x = out[i]
-
-        if(abs(oy-y) < 40 and abs(ox-x) < 40):
-            cout[i] = None
-
-    return np.array(filter(remFunc, cout))
-
-def rotatedBoundingRectangle(contour):
+    # out = [None] * len(contour)
+    #
+    # for i in xrange(len(contour)):
+    #     before = (contour[len(contour)-1][0] if i==0 else contour[i-1][0])
+    #     point = contour[i][0]
+    #     after = (contour[0][0] if i == len(contour)-1 else contour[i+1][0])
+    #
+    #     angle = calculateAngle(before, point, after)
+    #     out[i] = contour[i][0].tolist() if angle < 90 else None
+    #
+    # def remFunc(item):
+    #     return not item is None
+    #
+    # out = filter(remFunc, out)
+    #
+    # # copy out
+    # cout = list(out)
+    #
+    # # remove similar points
+    # # TODO: rewrite this to be more intelligent
+    # for i in xrange(len(out)):
+    #     if i == 0:
+    #         continue;
+    #
+    #     oy,ox = out[i-1]
+    #     y,x = out[i]
+    #
+    #     if(abs(oy-y) < 40 and abs(ox-x) < 40):
+    #         cout[i] = None
+    #
+    # return np.array(filter(remFunc, cout))
     rect = cv2.minAreaRect(contour)
     box = cv2.cv.BoxPoints(rect)
     box = np.int0(box)
@@ -306,8 +309,42 @@ def mat2euler(M, cy_thresh=None):
         x = 0.0
     return z, y, x
 
+# # estimates angle when board tilted far end left
+# def estimateAngleFunction1(thetaY):
+#     result = 0
+#
+#     result += angleFunc1A
+#
+#     try:
+#         result += angleFunc1B*math.log(thetaY)
+#     except ValueError:
+#         result = -999
+#
+#     return result
+#
+# # estimates angle when board tilted far end right
+# def estimateAngleFunction2(thetaY):
+#     thetaY = -thetaY
+#     thetaY += 7
+#
+#     result = 0
+#
+#     result += angleFunc2A
+#
+#     try:
+#         result += angleFunc2B*math.log(thetaY)
+#     except ValueError:
+#         result = -999
+#
+#     # subtract for correction
+#     try:
+#         result -= math.log(thetaY)
+#     except ValueError:
+#         result = -999
+#
+#     return result
 def calculateLateralAngle(offCenterX, distance):
-    return math.degrees(math.asin(offCenterX / distance))
+    return np.arcsin(offCenterX / distance)
 
 def estimateDistance(pixelHeight):
     return (estimateDistanceSlope * pixelHeight) + estimateDistanceIntercept
@@ -315,6 +352,17 @@ def estimateDistance(pixelHeight):
 def calculateDistanceToTarget(inchesOffCenterY):
     return (deltaAltitude + inchesOffCenterY) / np.tan(cameraAngle)
 
+# def estimateDistanceFunction1(translationZ):
+#     result = 0
+#     result += distFunc1A * translationZ
+#     result += distFunc1B
+#     return result
+#
+# def estimateDistanceFunction2(translationY):
+#     result = 0
+#     result += distFunc2A * translationY
+#     result += distFunc2B
+#     return result
 
 
 def countCameras():
@@ -358,8 +406,14 @@ h = cap.get(4)-114
 #displayThreshold = False
 
 # print instructions
-print "Gear Location program started..."
-print "Good luck on your mission!"
+print "Calibration program started..."
+print "Left click to include that value in calibration,"
+print "Each left click expands the range to include that value."
+print "Right click to toggle seeing what the mask looks like."
+print "After each click, the coordinates and hsv values are printed, then the current range."
+print "Press Q to exit."
+print ""
+
 
 t = 0
 directory = "calibration-images"
@@ -432,151 +486,165 @@ while(True):
         elif area > secondLargestArea:
             secondLargestArea = area
             secondLargestAreaIndex = i
-    #print "largestAreaIndex:", largestAreaIndex
-    #print "secondLargestAreaIndex:", secondLargestAreaIndex
 
     # if we have a largest area
     if(largestAreaIndex > -1):
-        #print "largestArea:", largestArea
-        #print "secondLargestArea:", secondLargestArea
         # get the contour
-        nearContour = contours[largestAreaIndex]
-        farContour = contours[secondLargestAreaIndex]
-        #print "Number of corners (Before):", len(nearContour)
-        #print "Number of corners (Far Before):", len(farContour)
-        cv2.drawContours(frame, [nearContour], -1, (255,0,0),3)
+        topContour = contours[largestAreaIndex]
+        bottomContour = contours[secondLargestAreaIndex]
         # simplify it (try to get it to 4 corners)
-        nearBox = simplifyContour(nearContour)
-        cv2.drawContours(frame, [nearContour], -1, (127,127,0),3)
-        farBox = simplifyContour(farContour)
-        dist = -777
-        angle = -777
-        centerValue = -777
-        #print "Near Contour Area:" , cv2.contourArea(nearContour)
-        #print "Far Contour Area:" , cv2.contourArea(farContour)
-        #print "Near Box Area:" , cv2.contourArea(nearBox)
-        #print "Far Box Area:" , cv2.contourArea(farBox)
+        topBox = simplifyContour(topContour)
+        bottomBox = simplifyContour(bottomContour)
 
-        if ((cv2.contourArea(farBox) > cv2.contourArea(nearBox) * 0.75) and (secondLargestAreaIndex != -1)):
-            # if the two contours are within 90% of each other in area, work with both.
-            print "Using two Contours:"
-            #print "Dist:", dist
-            # draw it on screen
-            cv2.drawContours(frame, [nearBox], -1, (16,16,223), 3)
-            cv2.drawContours(frame, [farBox], -1, (0,0,255), 3)
+        # draw it on screen
+        cv2.drawContours(frame, [topBox], -1, (16,16,223), 3)
+        cv2.drawContours(frame, [bottomBox], -1, (0,0,255), 3)
 
-            # if it has 4 corners
-            #print "number of corners:", len(nearBox), len(farBox)
-            if (len(nearBox) == 4) and (len(farBox) == 4):
-                # find the corners
-                aNear,bNear,cNear,dNear = findCorners2(nearBox)
-                aFar,bFar,cFar,dFar = findCorners2(farBox)
+        # if it has 4 corners
+        if len(topBox) == 4 and len(bottomBox) == 4:
+            # find the corners
+            # fc2 was just the most reliable IMO -sam
+            #aTop = topBox[0]
+            #bTop = topBox[1]
+            #cTop = topBox[2]
+            #dTop = topBox[3]
+            #aTop, bTop, cTop, dTop = cv2.cv.BoxPoints(topBox)
 
-                # draw the corners
-                drawPoint(frame, aNear, (0,255,0))
-                drawPoint(frame, bNear, (0,255,0))
-                drawPoint(frame, cNear, (0,255,255))
-                drawPoint(frame, dNear, (0,255,255))
-                drawPoint(frame, aFar, (255,0,0))
-                drawPoint(frame, bFar, (255,0,0))
-                drawPoint(frame, cFar, (255,0,255))
-                drawPoint(frame, dFar, (255,0,255))
+            aTop,bTop,cTop,dTop = findCorners2(topBox)
+            aBottom,bBottom,cBottom,dBottom = findCorners2(bottomBox)
 
-                centerXNear = (aNear[0] + bNear[0] + cNear[0] + dNear[0]) / 4
-                centerXFar = (aFar[0] + bFar[0] + cFar[0] + dFar[0]) / 4
-                centerYNear = (aNear[1] + bNear[1] + cNear[1] + dNear[1]) / 4
-                centerYFar = (aFar[1] + bFar[1] + cFar[1] + dFar[1]) / 4
+            #print (a,b,c,d)
+            # draw the corners
+            drawPoint(frame, aTop, (0,255,0))
+            drawPoint(frame, bTop, (0,255,0))
+            drawPoint(frame, cTop, (0,255,255))
+            drawPoint(frame, dTop, (0,255,255))
+            drawPoint(frame, aBottom, (255,0,0))
+            drawPoint(frame, bBottom, (255,0,0))
+            drawPoint(frame, cBottom, (255,0,255))
+            drawPoint(frame, dBottom, (255,0,255))
 
-                centerXTarget = 0
-                centerYTarget = 0
-                pixelDist = 0
-                pixelHeight = 0
-                if (aNear[0] < aFar[0]): # if the near contour is on the left
-                    centerXTarget = (aNear[0] + cNear[0] + bFar[0] + dFar[0]) / 4
-                    centerYTarget = (aNear[1] + cNear[1] + bFar[1] + dFar[1]) / 4
-                    topPixelDist = distance(aNear, bFar)
-                    bottomPixelDist = distance(cNear, dFar)
-                    pixelDist = (topPixelDist + bottomPixelDist) / 2
-                    leftPixelHeight = distance(aNear, cNear)
-                    rightPixelHeight = distance(bFar, dFar)
-                    pixelHeight = (leftPixelHeight + rightPixelHeight) / 2
-                else:
-                    centerXTarget = (aFar[0] + cFar[0] + bNear[0] + dNear[0]) / 4
-                    centerYTarget = (aFar[1] + cFar[1] + bNear[1] + dNear[1]) / 4
-                    topPixelDist = distance(aFar, bNear)
-                    bottomPixelDist = distance(cFar, dNear)
-                    pixelDist = (topPixelDist + bottomPixelDist) / 2
-                    leftPixelHeight = distance(aFar, cFar)
-                    rightPixelHeight = distance(bNear, dNear)
-                    pixelHeight = (leftPixelHeight + rightPixelHeight) / 2
 
-                pixelsOffCenterY = pixelsOffCenter(centerYTarget, h)
-                inchesOffCenterY = pixelsToInches(pixelsOffCenterY, pixelDist, targetDist)
-                dist = (deltaAltitude + inchesOffCenterY) / np.tan(cameraAngle)
-                pixelsOffCenterX = pixelsOffCenter(centerXTarget, w)
-                inchesOffCenterX = pixelsToInches(pixelsOffCenterX, pixelDist, targetDist)
-                print "inchesOffCenterX:" , inchesOffCenterX
-                #angle = calculateLateralAngle(inchesOffCenterX, dist)
-                centerValue = calculateCenter(centerXTarget, cameraWidth) + 1
-                #print "New Distance:", dist
+            # find the 2D transform
+            MTop,mwTop,mhTop = findTransform(topBox,(aTop,bTop,cTop,dTop))
+            MBottom,mwBottom,mhBottom = findTransform(bottomBox,(aBottom,bBottom,cBottom,dBottom))
+
+            # transform and get the transformed image
+            bwTop = cv2.warpPerspective(frame,MTop,(mwTop,mhTop))#(int(w),int(h)))
+            bwBottom = cv2.warpPerspective(frame,MBottom,(mwBottom,mhBottom))#(int(w),int(h)))
+
+            # convert tuple corners into lists
+            # for compatability with numpy
+            aTop2 = list(aTop)
+            #aTop2.reverse()
+            #a2.append(0.0)
+            bTop2 = list(bTop)
+            #bTop2.reverse()
+            #b2.append(0.0)
+            cTop2 = list(cTop)
+            #cTop2.reverse()
+            #c2.append(0.0)
+            dTop2 = list(dTop)
+            #dTop2.reverse()
+            #d2.append(0.0)
+            aBottom2 = list(aBottom)
+            #aBottom2.reverse()
+            #a2.append(0.0)
+            bBottom2 = list(bBottom)
+            #bBottom2.reverse()
+            #b2.append(0.0)
+            cBottom2 = list(cBottom)
+            #cBottom2.reverse()
+            #c2.append(0.0)
+            dBottom2 = list(dBottom)
+            #dBottom2.reverse()
+            #d2.append(0.0)
+
+            #centerXTop = (aTop[0] + bTop[0] + cTop[0] + dTop[0]) / 4
+            #centerXBottom = (aBottom[0] + bBottom[0] + cBottom[0] + dBottom[0]) / 4
+            #centerYTop = (aTop[1] + bTop[1] + cTop[1] + dTop[1]) / 4
+            #centerYBottom = (aBottom[1] + bBottom[1] + cBottom[1] + dBottom[1]) / 4
+            centerXTarget = (cTop[0] + dTop[0] + cBottom[0] + dBottom[0]) / 4
+            centerYTarget = (cTop[1] + dTop[1] + cBottom[1] + dBottom[1]) / 4
+            leftPixelHeight = distance(cTop, cBottom)
+            rightPixelHeight = distance(dTop, dBottom)
+            pixelHeight = (leftPixelHeight + rightPixelHeight) / 2
+
+            # 2d points representation of the object on screen in pixels
+            # (y,x)
+            imagePoints = np.array([cTop2,dTop2,cBottom2,dBottom2],dtype = "float32")
+
+            # 3d points representation of the object in (y,x,z)
+            #objectPoints = np.float32([[3,-6.5,0],[3,6.5,0],[-3,-6.5,0],[-3,6.5,0]])
+            #objectPoints = np.float32([[-7.5,3,0],[7.5,3,0],[-7.5,-3,0],[7.5,-3,0]])
+
+            # the hardest math: find the 3d rotation and translation vectors
+            # of a known size 3d plane based on screen coordinates
+            #ret,rvec,tvec = cv2.solvePnP(objectPoints,imagePoints,cameraMatrix,cameraDistortion,)
+
+            # calculate to rotation matrix
+            # don't ask me these weird names, we only want rM
+            #rM, jacobian = cv2.Rodrigues(rvec)
+
+            # get the xtheta, ytheta, and ztheta values
+            #xTheta,yTheta,zTheta = mat2euler(rM)
+
+            # move to degrees
+            #xTheta = math.degrees(xTheta)
+            #yTheta = math.degrees(yTheta)
+            #zTheta = math.degrees(zTheta)
+
+            # print them out
+            #print (xTheta,yTheta,zTheta)
+
+            # return the point as a decimal of the frame's dimensions
+
+            pixelsOffCenterY = pixelsOffCenter(centerYTarget, h)
+            inchesOffCenterY = pixelsToInches(pixelsOffCenterY, pixelHeight, targetHeight)
+            dist = (deltaAltitude + inchesOffCenterY) / np.tan(cameraAngle)
+            #distZ = estimateDistanceFunction1(tvec[2][0])
+            #distY = estimateDistanceFunction2(tvec[1][0])
+            #distFt = math.sqrt(distZ ** 2 + distY ** 2)
+            #print "dist z:", distZ
+            #print "dist y:", distY
+            #print "dist ft:", distFt
+
+            pixelsOffCenterX = pixelsOffCenter(centerXTarget, w)
+            inchesOffCenterX = pixelsToInches(pixelsOffCenterX, pixelHeight, targetHeight)
+            angle = calculateLateralAngle(inchesOffCenterX, dist)
+            #angle = arbitrateValue(estimateAngleFunction1(yTheta),estimateAngleFunction2(yTheta))
+            #dist = distFt * 12
+
+            centerValue = calculateCenter(centerXTarget, cameraWidth)
+
+
+            # publish
+            table.putNumber('distance',dist)
+            table.putNumber('angle',angle)
+            table.putNumber('center',centerValue)
+            print "topPoints:"
+            print "  a: (" , aTop[0] , ", " , aTop[1] , ")"
+            print "  b: (" , bTop[0] , ", " , bTop[1] , ")"
+            print "  c: (" , cTop[0] , ", " , cTop[1] , ")"
+            print "  d: (" , dTop[0] , ", " , dTop[1] , ")"
+            print "bottomPoints:"
+            print "  a: (" , aBottom[0] , ", " , aBottom[1] , ")"
+            print "  b: (" , bBottom[0] , ", " , bBottom[1] , ")"
+            print "  c: (" , cBottom[0] , ", " , cBottom[1] , ")"
+            print "  d: (" , dBottom[0] , ", " , dBottom[1] , ")"
+            print distance(aTop, aBottom)
+            print distance(bTop, bBottom)
+
+            #print "bottomCenter", centerXBottom, centerYBottom
+            #print "topCenter", centerXTop, centerYTop
+
+            print "dist:", dist
+            print "angle:", angle
+            print "centerValue:", centerValue
         else:
-            #if one contour is larger, do calculations based on that one.
-            print "Using one Contour:"
-            #print "dist:", dist
-            # draw it on screen
-            cv2.drawContours(frame, [nearBox], -1, (16,16,223), 3)
-
-            # if it has 4 corners
-            #print "Number of Corners:", len(nearBox)
-            if (len(nearBox) == 4):
-                # find the corners
-                a,b,c,d = findCorners2(nearBox)
-
-                # draw the corners
-                drawPoint(frame, a, (0,255,0))
-                drawPoint(frame, b, (0,255,0))
-                drawPoint(frame, c, (0,255,255))
-                drawPoint(frame, d, (0,255,255))
-
-                centerX = (a[0] + b[0] + c[0] + d[0]) / 4
-                centerY = (a[1] + b[1] + c[1] + d[1]) / 4
-                print "center of contour:", centerX, centerY
-                e  = np.array([(a[0] + c[0]) / 2, (a[1] + c[1]) / 2], dtype = "float32")
-                f  = np.array([(b[0] + d[0]) / 2, (b[1] + d[1]) / 2], dtype = "float32")
-                drawPoint(frame, e, (255,0,255))
-                drawPoint(frame, f, (255,0,255))
-                thetaY = np.arctan((e[1] - f[1])/(e[0] - f[0]))
-                pixelWidth = distance(e, f)
-                inchesOffCenterTargetX = 0
-                pixelsOffCenterX = pixelsOffCenter(centerX, w)
-                inchesOffCenterX = pixelsToInches(pixelsOffCenterX, pixelWidth, targetWidth)
-                inchesOffCenterTargetX = inchesOffCenterX
-                if (a[1] < b[1]): # should run if the near contour is on the left (of the peg)
-                    inchesOffCenterTargetX = inchesOffCenterX + 4.125
-                    print "Left side of Target"
-                else:
-                    inchesOffCenterTargetX = inchesOffCenterX - 4.125
-                    print "Right side of Target"
-                pixelsOffCenterY = pixelsOffCenter(centerY, h)
-                inchesOffCenterY = pixelsToInches(pixelsOffCenterY, pixelWidth, targetWidth)
-                print "pixelsX:", pixelsOffCenterX
-                print "inchesX:", inchesOffCenterX
-                print "inchesTargetX:", inchesOffCenterTargetX
-                dist = (deltaAltitude + inchesOffCenterY) / np.tan(cameraAngle)
-                #pixelsOffCenterX = pixelsOffCenter(centerXTarget, w)
-                #inchesOffCenterX = pixelsToInches(pixelsOffCenterX, pixelDist, targetDist)
-                #angle = calculateLateralAngle(inchesOffCenterTargetX, dist)
-                centerValue = calculateCenter(inchesOffCenterTargetX / targetWidth, cameraWidth) + 1
-                #print "New Distance:", dist
-
-        # publish
-        table.putNumber('distance',dist)
-        table.putNumber('angle',angle)
-        table.putNumber('center',centerValue)
-
-        #print "dist:", dist
-        #print "angle:", angle
-        print "centerValue:", centerValue
+            table.putNumber('distance',-999)
+            table.putNumber('angle',-999)
+            table.putNumber('center',-999)
 
     else:
         table.putNumber('distance',-999)
