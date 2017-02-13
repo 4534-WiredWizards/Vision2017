@@ -792,7 +792,7 @@ while(True):
     t += 1
     if(t % 2 == 0):
         gearCap = cv2.VideoCapture(0)
-        print "gearFPS:", gearCap.get(CV_CAP_PROP_FPS)
+        #print "gearFPS:", gearCap.get(CV_CAP_PROP_FPS)
         gearRet, gearFrame = gearCap.read()
         gearFrame = gearFrame[114:480, 0:640]
         gearDist, gearAngle, gearCV = gearLocate(gearFrame)
@@ -813,7 +813,7 @@ while(True):
 
     else:
         boilerCap = cv2.VideoCapture(1)
-        print "boilerFPS:", boilerCap.get(CV_CAP_PROP_FPS)
+        #print "boilerFPS:", boilerCap.get(5)
         boilerRet, boilerFrame = boilerCap.read()
         boilerFrame = boilerFrame[114:480, 0:640]
         boilerDist, boilerAngle, boilerCV = boilerLocate(boilerFrame)
