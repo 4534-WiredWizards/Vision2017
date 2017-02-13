@@ -29,25 +29,38 @@ displayThreshold = False
 ### END GLOBALS ###
 ### CONSTANTS ###
 # Camera's physical height (inches) above ground
-cameraAltitude = 14
+boilerCameraAltitude = 24
+gearCameraAltitude = 5
 
 # Camera's Angle (degrees) above horizontal
-cameraAngle = 2.5
+gearCameraAngle = 1
+boilerCameraAngle = 30
 
 # Height of center of target (inches) above ground
-targetAltitude = 13.25
+boilerTargetAltitude = 83
+gearTargetAltitude = 13.25
 
-# Difference between camera height and target height, useful for the trig.
-deltaAltitude = targetAltitude - cameraAltitude
-
-# horizontal size (inches) of vision target.
-targetWidth = 2
+# Difference between camera hieght and target height, useful for the trig.
+boilerDeltaAltitude = boilerTargetAltitude - boilerCameraAltitude
+boilerDeltaAltitude = gearTargetAltitude - gearCameraAltitude
 
 # vertical size (inches) of vision target.
-targetHeight = 5
+boilerTargetHeight = 6
+gearTargetHeight = 5
 
-# Size from one target to the other, for 2 contour sensing
-targetDist = 10.25
+gearTargetDist = 10.25
+gearTargetWidth = 2
+
+# angle function values
+#angleFunc1A = -90.535724570955
+#angleFunc1B = 45.247456281206
+#angleFunc2A = -5.511621418651
+#angleFunc2B = 24.318446167847
+# distance function values
+estimateDistanceSlope = 0.08748759788249
+estimateDistanceIntercept = -0.5189968934245
+#distFunc2A = -0.1414458147376
+#distFunc2B = -0.0675841969269
 
 ### END CONSTANTS ###
 ### CALIBRATION ###
@@ -58,9 +71,10 @@ cameraMatrix = np.float32([[1.12033194e+03, 0.0, 6.49786694e+02],
                            [0.0, 0.0, 1.0]])
 cameraDistortion = np.float32([0.15190902, -0.78835469, 0.00402702, -0.00291226, -1.00032999])
 # color calibration
-calibrationTuple = ((62, 144, 44), (82, 255, 146), (44, 76, 0), (90, 166, 22))
-
-calLowHSV, calHighHSV, calLowBGR, calHighBGR = calibrationTuple
+gearCalibrationTuple = ((64, 213, 66), (74, 255, 105), (14, 66, 0), (42, 105, 13))
+gearCalLowHSV, gearCalHighHSV, gearCalLowBGR, gearCalHighBGR = gearCalibrationTuple
+boilerCalibrationTuple = ((75, 73, 98), (81, 164, 175), (75, 98, 35), (148, 175, 95))
+boilerCalLowHSV, boilerCalHighHSV, boilerCalLowBGR, boilerCalHighBGR = boilerCalibrationTuple
 
 # exposure
 exposure = -9
@@ -154,39 +168,37 @@ def pixelsToInches(inputPixels, refPixels, refInches):
 
 def simplifyContour(contour):
 
-    out = [None] * len(contour)
-
-    for i in xrange(len(contour)):
-        before = (contour[len(contour)-1][0] if i==0 else contour[i-1][0])
-        point = contour[i][0]
-        after = (contour[0][0] if i == len(contour)-1 else contour[i+1][0])
-
-        angle = calculateAngle(before, point, after)
-        out[i] = contour[i][0].tolist() if angle < 90 else None
-
-    def remFunc(item):
-        return not item is None
-
-    out = filter(remFunc, out)
-
-    # copy out
-    cout = list(out)
-
-    # remove similar points
-    # TODO: rewrite this to be more intelligent
-    for i in xrange(len(out)):
-        if i == 0:
-            continue;
-
-        oy,ox = out[i-1]
-        y,x = out[i]
-
-        if(abs(oy-y) < 40 and abs(ox-x) < 40):
-            cout[i] = None
-
-    return np.array(filter(remFunc, cout))
-
-def rotatedBoundingRectangle(contour):
+    # out = [None] * len(contour)
+    #
+    # for i in xrange(len(contour)):
+    #     before = (contour[len(contour)-1][0] if i==0 else contour[i-1][0])
+    #     point = contour[i][0]
+    #     after = (contour[0][0] if i == len(contour)-1 else contour[i+1][0])
+    #
+    #     angle = calculateAngle(before, point, after)
+    #     out[i] = contour[i][0].tolist() if angle < 90 else None
+    #
+    # def remFunc(item):
+    #     return not item is None
+    #
+    # out = filter(remFunc, out)
+    #
+    # # copy out
+    # cout = list(out)
+    #
+    # # remove similar points
+    # # TODO: rewrite this to be more intelligent
+    # for i in xrange(len(out)):
+    #     if i == 0:
+    #         continue;
+    #
+    #     oy,ox = out[i-1]
+    #     y,x = out[i]
+    #
+    #     if(abs(oy-y) < 40 and abs(ox-x) < 40):
+    #         cout[i] = None
+    #
+    # return np.array(filter(remFunc, cout))
     rect = cv2.minAreaRect(contour)
     box = cv2.cv.BoxPoints(rect)
     box = np.int0(box)
@@ -306,8 +318,42 @@ def mat2euler(M, cy_thresh=None):
         x = 0.0
     return z, y, x
 
+# # estimates angle when board tilted far end left
+# def estimateAngleFunction1(thetaY):
+#     result = 0
+#
+#     result += angleFunc1A
+#
+#     try:
+#         result += angleFunc1B*math.log(thetaY)
+#     except ValueError:
+#         result = -999
+#
+#     return result
+#
+# # estimates angle when board tilted far end right
+# def estimateAngleFunction2(thetaY):
+#     thetaY = -thetaY
+#     thetaY += 7
+#
+#     result = 0
+#
+#     result += angleFunc2A
+#
+#     try:
+#         result += angleFunc2B*math.log(thetaY)
+#     except ValueError:
+#         result = -999
+#
+#     # subtract for correction
+#     try:
+#         result -= math.log(thetaY)
+#     except ValueError:
+#         result = -999
+#
+#     return result
 def calculateLateralAngle(offCenterX, distance):
-    return math.degrees(math.asin(offCenterX / distance))
+    return np.arcsin(offCenterX / distance)
 
 def estimateDistance(pixelHeight):
     return (estimateDistanceSlope * pixelHeight) + estimateDistanceIntercept
@@ -315,6 +361,17 @@ def estimateDistance(pixelHeight):
 def calculateDistanceToTarget(inchesOffCenterY):
     return (deltaAltitude + inchesOffCenterY) / np.tan(cameraAngle)
 
+# def estimateDistanceFunction1(translationZ):
+#     result = 0
+#     result += distFunc1A * translationZ
+#     result += distFunc1B
+#     return result
+#
+# def estimateDistanceFunction2(translationY):
+#     result = 0
+#     result += distFunc2A * translationY
+#     result += distFunc2B
+#     return result
 
 
 def countCameras():
@@ -340,52 +397,171 @@ def arbitrateValue(v1,v2):
         return v2
     return -999
 
-### END FUNCTIONS ###
+def boilerLocate(frame):
+    dist = -777
+    centerValue = -777
+    angle = -777
+    try:
+    # Our operations on the frame come here
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    except cv2.error:
+        print "Camera not found. Exiting..."
+        exit(1)
+    cv2.imwrite('frame.jpg', frame)
+    cv2.imwrite('hsv.jpg', hsv)
 
-# instantiate the video capture object
-#cap = cv2.VideoCapture(countCameras())
-cap = cv2.VideoCapture(0)
+    # get the calibration values in
+    hsvLow = np.array(list(boilerCalLowHSV))
+    hsvHigh = np.array(list(boilerCalHighHSV))
+    bgrLow = np.array(list(boilerCalLowBGR))
+    bgrHigh = np.array(list(boilerCalHighBGR))
 
-# get the width and height
-w = cap.get(3)
-h = cap.get(4)-114
+    # use the calibration values to mask out what we want
+    mask = cv2.inRange(hsv, hsvLow, hsvHigh)
+    mask2 = cv2.inRange(frame, bgrLow, bgrHigh)
 
-# set the window as a named window so the click function can be bound
-# cv2.namedWindow("frame")
-# bind the click function
-# cv2.setMouseCallback("frame",clickFunc)
+    # combine the masks
+    bw = cv2.bitwise_and(mask,mask2)
 
-#displayThreshold = False
+    # dilate the image to simplify small black bits
+    bw = cv2.dilate(bw, None, None, None, 3)
 
-# print instructions
-print "Gear Location program started..."
-print "Good luck on your mission!"
+    # contour it
+    contours, hierarchy = cv2.findContours(bw,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
 
-t = 0
-directory = "calibration-images"
+    # find the largest area contour
+    largestArea = 0
+    secondLargestArea = 0
+    largestAreaIndex = -1
+    secondLargestAreaIndex = -1
+    for i in xrange(len(contours)):
+        contours[i] = cv2.convexHull(contours[i])
+        area = cv2.contourArea(contours[i])
+        if area > largestArea:
+            secondLargestArea = largestArea
+            secondLargestAreaIndex = largestAreaIndex
+            largestArea = area
+            largestAreaIndex = i
+        elif area > secondLargestArea:
+            secondLargestArea = area
+            secondLargestAreaIndex = i
 
-# infinite loop until brokwnk
-while(True):
-    # set exposure
-    #cap.set(cv2.cv.CV_CAP_PROP_EXPOSURE,exposure)
+    # if we have a largest area
+    if(largestAreaIndex > -1):
+        # get the contour
+        topContour = contours[largestAreaIndex]
+        bottomContour = contours[secondLargestAreaIndex]
+        # simplify it (try to get it to 4 corners)
+        topBox = simplifyContour(topContour)
+        bottomBox = simplifyContour(bottomContour)
 
-    # capture each frame
-    ret, frame = cap.read()
+        # draw it on screen
+        cv2.drawContours(frame, [topBox], -1, (16,16,223), 3)
+        cv2.drawContours(frame, [bottomBox], -1, (0,0,255), 3)
 
-    frame = frame[114:480, 0:640]
+        # if it has 4 corners
+        if len(topBox) == 4 and len(bottomBox) == 4:
+            # find the corners
+            # fc2 was just the most reliable IMO -sam
+            #aTop = topBox[0]
+            #bTop = topBox[1]
+            #cTop = topBox[2]
+            #dTop = topBox[3]
+            #aTop, bTop, cTop, dTop = cv2.cv.BoxPoints(topBox)
 
-    # flip the frame (optional)
-    #frame = cv2.flip(frame,1)
-    #frame = cv2.flip(frame,0)
+            aTop,bTop,cTop,dTop = findCorners2(topBox)
+            aBottom,bBottom,cBottom,dBottom = findCorners2(bottomBox)
 
-    t += 1
-    if (t % 20 == 0):
-        filename = "0" * (5 - len(str(t))) + str(t)
-        filename = directory+"/"+filename+".jpg"
-        logfile.write("Writing %s"%(filename))
-        cv2.imwrite(filename, frame)
-        logfile.write("Complete")
+            #print (a,b,c,d)
+            # draw the corners
+            drawPoint(frame, aTop, (0,255,0))
+            drawPoint(frame, bTop, (0,255,0))
+            drawPoint(frame, cTop, (255,255,255))
+            drawPoint(frame, dTop, (0,255,255))
+            drawPoint(frame, aBottom, (255,0,0))
+            drawPoint(frame, bBottom, (255,0,0))
+            drawPoint(frame, cBottom, (255,255,255))
+            drawPoint(frame, dBottom, (255,0,255))
 
+
+            # # find the 2D transform
+            # MTop,mwTop,mhTop = findTransform(topBox,(aTop,bTop,cTop,dTop))
+            # MBottom,mwBottom,mhBottom = findTransform(bottomBox,(aBottom,bBottom,cBottom,dBottom))
+            #
+            # # transform and get the transformed image
+            # bwTop = cv2.warpPerspective(frame,MTop,(mwTop,mhTop))#(int(w),int(h)))
+            # bwBottom = cv2.warpPerspective(frame,MBottom,(mwBottom,mhBottom))#(int(w),int(h)))
+
+            #centerXTop = (aTop[0] + bTop[0] + cTop[0] + dTop[0]) / 4
+            #centerXBottom = (aBottom[0] + bBottom[0] + cBottom[0] + dBottom[0]) / 4
+            #centerYTop = (aTop[1] + bTop[1] + cTop[1] + dTop[1]) / 4
+            #centerYBottom = (aBottom[1] + bBottom[1] + cBottom[1] + dBottom[1]) / 4
+            centerXTarget = (cTop[0] + dTop[0] + cBottom[0] + dBottom[0]) / 4
+            centerYTarget = (cTop[1] + dTop[1] + cBottom[1] + dBottom[1]) / 4
+            drawPoint(frame, (int(centerXTarget), int(centerYTarget)), (0,0,0))
+            drawPoint(frame, (int(w/2), int(centerYTarget)), (0,0,0))
+            leftPixelHeight = distance(cTop, cBottom)
+            rightPixelHeight = distance(dTop, dBottom)
+            pixelHeight = (leftPixelHeight + rightPixelHeight) / 2
+
+            # 2d points representation of the object on screen in pixels
+            # (y,x)
+            #imagePoints = np.array([cTop2,dTop2,cBottom2,dBottom2],dtype = "float32")
+
+            # 3d points representation of the object in (y,x,z)
+            #objectPoints = np.float32([[3,-6.5,0],[3,6.5,0],[-3,-6.5,0],[-3,6.5,0]])
+            #objectPoints = np.float32([[-7.5,3,0],[7.5,3,0],[-7.5,-3,0],[7.5,-3,0]])
+
+            # the hardest math: find the 3d rotation and translation vectors
+            # of a known size 3d plane based on screen coordinates
+            #ret,rvec,tvec = cv2.solvePnP(objectPoints,imagePoints,cameraMatrix,cameraDistortion,)
+
+            # calculate to rotation matrix
+            # don't ask me these weird names, we only want rM
+            #rM, jacobian = cv2.Rodrigues(rvec)
+
+            # get the xtheta, ytheta, and ztheta values
+            #xTheta,yTheta,zTheta = mat2euler(rM)
+
+            # move to degrees
+            #xTheta = math.degrees(xTheta)
+            #yTheta = math.degrees(yTheta)
+            #zTheta = math.degrees(zTheta)
+
+            # print them out
+            #print (xTheta,yTheta,zTheta)
+
+            # return the point as a decimal of the frame's dimensions
+
+            #pixelsOffCenterY = pixelsOffCenter(centerYTarget, h)
+            #inchesOffCenterY = pixelsToInches(pixelsOffCenterY, pixelHeight, targetHeight)
+            #dist = (deltaAltitude + inchesOffCenterY) / np.tan(cameraAngle)
+            #distZ = estimateDistanceFunction1(tvec[2][0])
+            #distY = estimateDistanceFunction2(tvec[1][0])
+            #distFt = math.sqrt(distZ ** 2 + distY ** 2)
+            #print "dist z:", distZ
+            #print "dist y:", distY
+            #print "dist ft:", distFt
+
+            pixelsOffCenterX = pixelsOffCenter(centerXTarget, w)
+            inchesOffCenterX = pixelsToInches(pixelsOffCenterX, pixelHeight, boilerTargetHeight)
+            #angle = calculateLateralAngle(inchesOffCenterX, dist)
+            #angle = arbitrateValue(estimateAngleFunction1(yTheta),estimateAngleFunction2(yTheta))
+            #dist = distFt * 12
+            if(pixelHeight != 0):
+                dist = (boilerTargetHeight * h * 0.6305) / (2 * pixelHeight * math.tan(0.418224329)) # the angle  is a constant: the tangent of half of the camera's field of view angle.
+            angle = math.atan2(inchesOffCenterX , dist)
+
+            centerValue = calculateCenter(centerXTarget, cameraWidth)
+            centerValue = inchesOffCenterX
+
+    return dist, angle, centerValue
+
+def gearLocate(frame):
+    dist = -777
+    angle = -777
+    centerValue = -777
+    ratio = -777
     try:
     # Our operations on the frame come here
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -393,15 +569,14 @@ while(True):
         print "Camera not found. Exiting..."
         exit(1)
 
-
     cv2.imwrite('frame.jpg', frame)
     cv2.imwrite('hsv.jpg', hsv)
 
     # get the calibration values in
-    hsvLow = np.array(list(calLowHSV))
-    hsvHigh = np.array(list(calHighHSV))
-    bgrLow = np.array(list(calLowBGR))
-    bgrHigh = np.array(list(calHighBGR))
+    hsvLow = np.array(list(gearCalLowHSV))
+    hsvHigh = np.array(list(gearCalHighHSV))
+    bgrLow = np.array(list(gearCalLowBGR))
+    bgrHigh = np.array(list(gearCalHighBGR))
 
     # use the calibration values to mask out what we want
     mask = cv2.inRange(hsv, hsvLow, hsvHigh)
@@ -449,10 +624,7 @@ while(True):
         nearBox = simplifyContour(nearContour)
         cv2.drawContours(frame, [nearContour], -1, (127,127,0),3)
         farBox = simplifyContour(farContour)
-        dist = -777
-        angle = -777
-        centerValue = -777
-        ratio = -777
+
         #print "Near Contour Area:" , cv2.contourArea(nearContour)
         #print "Far Contour Area:" , cv2.contourArea(farContour)
         #print "Near Box Area:" , cv2.contourArea(nearBox)
@@ -515,8 +687,11 @@ while(True):
                 #dist = (deltaAltitude + inchesOffCenterY) / np.tan(cameraAngle)
                 ratio = (leftPixelHeight * 1.0 / rightPixelHeight * 1.0)
                 pixelsOffCenterX = pixelsOffCenter(centerXTarget, w)
-                inchesOffCenterX = pixelsToInches(pixelsOffCenterX, pixelDist, targetDist)
+                inchesOffCenterX = pixelsToInches(pixelsOffCenterX, pixelDist, gearTargetDist)
                 centerValue = inchesOffCenterX
+                if(pixelHeight != 0):
+                    dist = (gearTargetHeight * h * 0.6305) / (2 * pixelHeight * math.tan(0.418224329)) # the angle  is a constant: the tangent of half of the camera's field of view angle.
+                angle = math.atan2(inchesOffCenterX , dist)
                 #print "inchesOffCenterX:" , inchesOffCenterX
                 #angle = calculateLateralAngle(inchesOffCenterX, dist)
                 #centerValue = calculateCenter(centerXTarget, cameraWidth) + 1
@@ -552,7 +727,7 @@ while(True):
                 #print "pixelWidth:", pixelWidth
                 inchesOffCenterTargetX = 0
                 pixelsOffCenterX = pixelsOffCenter(centerX, w)
-                inchesOffCenterX = pixelsToInches(pixelsOffCenterX, pixelWidth, targetWidth)
+                inchesOffCenterX = pixelsToInches(pixelsOffCenterX, pixelWidth, gearTargetWidth)
                 inchesOffCenterTargetX = inchesOffCenterX
                 if (a[1] < b[1]): # should run if the near contour is on the left (of the peg)
                     inchesOffCenterTargetX = inchesOffCenterX - 4.125
@@ -569,28 +744,90 @@ while(True):
                 #print "inchesX:", inchesOffCenterX
                 #print "inchesTargetX:", inchesOffCenterTargetX
                 #dist = (deltaAltitude + inchesOffCenterY) / np.tan(cameraAngle)
-                #angle = calculateLateralAngle(inchesOffCenterTargetX, dist)
-                #centerValue = calculateCenter(inchesOffCenterTargetX / targetWidth, cameraWidth) + 1
-                #print "New Distance:", dist
+                if(pixelWidth != 0):
+                    dist = (gearTargetWidth * h * 0.6305) / (2 * pixelWidth * math.tan(0.418224329)) # the angle  is a constant: the tangent of half of the camera's field of view angle.
+                angle = math.atan2(inchesOffCenterTargetX , dist)
+                #centerValue = calculateCenter((cameraWidth / 2) + (inchesOffCenterTargetX / targetWidth), cameraWidth)
+    return dist, angle, centerValue
 
-        # publish
-        #table.putNumber('distance',dist)
-        #table.putNumber('angle',angle)
-        table.putNumber('center',centerValue)
-        table.putNumber('ratio',ratio)
+### END FUNCTIONS ###
 
-        #print "dist:", dist
-        #print "angle:", angle
-        print "centerValue:", centerValue
-        print "ratio:", ratio
+# instantiate the video capture object
+#cap = cv2.VideoCapture(countCameras())
+
+# get the width and height
+w = 640
+h = 366
+
+# set the window as a named window so the click function can be bound
+# cv2.namedWindow("frame")
+# bind the click function
+# cv2.setMouseCallback("frame",clickFunc)
+
+#displayThreshold = False
+
+# print instructions
+print "Location program started..."
+print "Good luck on your Mission!"
+
+
+t = 0
+directory = "calibration-images"
+
+# infinite loop until brokwnk
+while(True):
+    # set exposure
+    #cap.set(cv2.cv.CV_CAP_PROP_EXPOSURE,0.1)
+    #print "Exposure:", cap.get(15)
+    #print "Brightness:", cap.get(10)
+    #print "Contrast:", cap.get(11)
+    #print "Gain:", cap.get(14)
+
+    # capture each frame
+
+
+    # flip the frame (optional)
+    #frame = cv2.flip(frame,1)
+    #frame = cv2.flip(frame,0)
+    t += 1
+    if(t % 2 == 0):
+        gearCap = cv2.VideoCapture(0)
+        print "gearFPS:", gearCap.get(CV_CAP_PROP_FPS)
+        gearRet, gearFrame = gearCap.read()
+        gearFrame = gearFrame[114:480, 0:640]
+        gearDist, gearAngle, gearCV = gearLocate(gearFrame)
+        print "gearDist:", gearDist
+        print "gearAngle:", gearAngle
+        print "gearCV:", gearCV
+        table.putNumber('gearDistance', gearDist)
+        table.putNumber('gearCV', gearCV)
+        table.putNumber('gearAngle', gearAngle)
+        cv2.imwrite('gear-frame-out.jpg', gearFrame)
+        if (t % 60 == 0):
+            filename = "0" * (5 - len(str(t))) + str(t)
+            filename = directory+"/"+"gear"+"/"+filename+".jpg"
+            logfile.write("Writing %s"%(filename))
+            cv2.imwrite(filename, gearFrame)
+            logfile.write("Complete")
+       	gearCap.release()
 
     else:
-        #table.putNumber('distance',-999)
-        #table.putNumber('angle',-999)
-        table.putNumber('center',-999)
-        table.putNumber('ratio',-999)
-
-    cv2.imwrite('frame-out.jpg', frame)
-
-# When everything done, release the capture
-cap.release()
+        boilerCap = cv2.VideoCapture(1)
+        print "boilerFPS:", boilerCap.get(CV_CAP_PROP_FPS)
+        boilerRet, boilerFrame = boilerCap.read()
+        boilerFrame = boilerFrame[114:480, 0:640]
+        boilerDist, boilerAngle, boilerCV = boilerLocate(boilerFrame)
+        table.putNumber('boilerDistance', boilerDist)
+        table.putNumber('boilerAngle', boilerAngle)
+        table.putNumber('boilerCV', boilerCV)
+        print "boilerDist:", boilerDist
+        print "boilerAngle:", boilerAngle
+        print "boilerCV:", boilerCV
+        cv2.imwrite('boiler-frame-out.jpg', boilerFrame)
+        if (t % 60 == 1):
+            filename = "0" * (5 - len(str(t))) + str(t)
+            filename = directory+"/"+"boiler"+"/"+filename+".jpg"
+            logfile.write("Writing %s"%(filename))
+            cv2.imwrite(filename, boilerFrame)
+            logfile.write("Complete")
+        boilerCap.release()

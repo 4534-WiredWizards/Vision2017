@@ -63,7 +63,7 @@ cameraMatrix = np.float32([[1.12033194e+03, 0.0, 6.49786694e+02],
                            [0.0, 0.0, 1.0]])
 cameraDistortion = np.float32([0.15190902, -0.78835469, 0.00402702, -0.00291226, -1.00032999])
 # color calibration
-calibrationTuple = ((62, 144, 44), (82, 255, 146), (32, 100, 0), (54, 146, 0))
+calibrationTuple = ((70, 50, 57), (82, 179, 138), (0, 67, 0), (107, 131, 103))
 
 calLowHSV, calHighHSV, calLowBGR, calHighBGR = calibrationTuple
 
@@ -392,7 +392,7 @@ def arbitrateValue(v1,v2):
 
 # instantiate the video capture object
 #cap = cv2.VideoCapture(countCameras())
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 
 # get the width and height
 w = cap.get(3)
@@ -406,13 +406,10 @@ h = cap.get(4)-114
 #displayThreshold = False
 
 # print instructions
-print "Calibration program started..."
-print "Left click to include that value in calibration,"
-print "Each left click expands the range to include that value."
-print "Right click to toggle seeing what the mask looks like."
-print "After each click, the coordinates and hsv values are printed, then the current range."
-print "Press Q to exit."
-print ""
+print "Boiler location program started..."
+print "Good luck on your Mission!"
+cap.set(12, .2)
+cap.set(10, -.1)
 
 
 t = 0
@@ -421,7 +418,12 @@ directory = "calibration-images"
 # infinite loop until brokwnk
 while(True):
     # set exposure
-    #cap.set(cv2.cv.CV_CAP_PROP_EXPOSURE,exposure)
+    #cap.set(cv2.cv.CV_CAP_PROP_EXPOSURE,0.1)
+    #print "Exposure:", cap.get(15)
+    #print "Brightness:", cap.get(10)
+    #print "Contrast:", cap.get(11)
+    #print "Gain:", cap.get(14)
+
 
     # capture each frame
     ret, frame = cap.read()
@@ -499,6 +501,7 @@ while(True):
         # draw it on screen
         cv2.drawContours(frame, [topBox], -1, (16,16,223), 3)
         cv2.drawContours(frame, [bottomBox], -1, (0,0,255), 3)
+        dist = -777
 
         # if it has 4 corners
         if len(topBox) == 4 and len(bottomBox) == 4:
@@ -517,48 +520,21 @@ while(True):
             # draw the corners
             drawPoint(frame, aTop, (0,255,0))
             drawPoint(frame, bTop, (0,255,0))
-            drawPoint(frame, cTop, (0,255,255))
+            drawPoint(frame, cTop, (255,255,255))
             drawPoint(frame, dTop, (0,255,255))
             drawPoint(frame, aBottom, (255,0,0))
             drawPoint(frame, bBottom, (255,0,0))
-            drawPoint(frame, cBottom, (255,0,255))
+            drawPoint(frame, cBottom, (255,255,255))
             drawPoint(frame, dBottom, (255,0,255))
 
 
-            # find the 2D transform
-            MTop,mwTop,mhTop = findTransform(topBox,(aTop,bTop,cTop,dTop))
-            MBottom,mwBottom,mhBottom = findTransform(bottomBox,(aBottom,bBottom,cBottom,dBottom))
-
-            # transform and get the transformed image
-            bwTop = cv2.warpPerspective(frame,MTop,(mwTop,mhTop))#(int(w),int(h)))
-            bwBottom = cv2.warpPerspective(frame,MBottom,(mwBottom,mhBottom))#(int(w),int(h)))
-
-            # convert tuple corners into lists
-            # for compatability with numpy
-            aTop2 = list(aTop)
-            #aTop2.reverse()
-            #a2.append(0.0)
-            bTop2 = list(bTop)
-            #bTop2.reverse()
-            #b2.append(0.0)
-            cTop2 = list(cTop)
-            #cTop2.reverse()
-            #c2.append(0.0)
-            dTop2 = list(dTop)
-            #dTop2.reverse()
-            #d2.append(0.0)
-            aBottom2 = list(aBottom)
-            #aBottom2.reverse()
-            #a2.append(0.0)
-            bBottom2 = list(bBottom)
-            #bBottom2.reverse()
-            #b2.append(0.0)
-            cBottom2 = list(cBottom)
-            #cBottom2.reverse()
-            #c2.append(0.0)
-            dBottom2 = list(dBottom)
-            #dBottom2.reverse()
-            #d2.append(0.0)
+            # # find the 2D transform
+            # MTop,mwTop,mhTop = findTransform(topBox,(aTop,bTop,cTop,dTop))
+            # MBottom,mwBottom,mhBottom = findTransform(bottomBox,(aBottom,bBottom,cBottom,dBottom))
+            #
+            # # transform and get the transformed image
+            # bwTop = cv2.warpPerspective(frame,MTop,(mwTop,mhTop))#(int(w),int(h)))
+            # bwBottom = cv2.warpPerspective(frame,MBottom,(mwBottom,mhBottom))#(int(w),int(h)))
 
             #centerXTop = (aTop[0] + bTop[0] + cTop[0] + dTop[0]) / 4
             #centerXBottom = (aBottom[0] + bBottom[0] + cBottom[0] + dBottom[0]) / 4
@@ -566,13 +542,15 @@ while(True):
             #centerYBottom = (aBottom[1] + bBottom[1] + cBottom[1] + dBottom[1]) / 4
             centerXTarget = (cTop[0] + dTop[0] + cBottom[0] + dBottom[0]) / 4
             centerYTarget = (cTop[1] + dTop[1] + cBottom[1] + dBottom[1]) / 4
+            drawPoint(frame, (int(centerXTarget), int(centerYTarget)), (0,0,0))
+            drawPoint(frame, (int(w/2), int(centerYTarget)), (0,0,0))
             leftPixelHeight = distance(cTop, cBottom)
             rightPixelHeight = distance(dTop, dBottom)
             pixelHeight = (leftPixelHeight + rightPixelHeight) / 2
 
             # 2d points representation of the object on screen in pixels
             # (y,x)
-            imagePoints = np.array([cTop2,dTop2,cBottom2,dBottom2],dtype = "float32")
+            #imagePoints = np.array([cTop2,dTop2,cBottom2,dBottom2],dtype = "float32")
 
             # 3d points representation of the object in (y,x,z)
             #objectPoints = np.float32([[3,-6.5,0],[3,6.5,0],[-3,-6.5,0],[-3,6.5,0]])
@@ -599,9 +577,9 @@ while(True):
 
             # return the point as a decimal of the frame's dimensions
 
-            pixelsOffCenterY = pixelsOffCenter(centerYTarget, h)
-            inchesOffCenterY = pixelsToInches(pixelsOffCenterY, pixelHeight, targetHeight)
-            dist = (deltaAltitude + inchesOffCenterY) / np.tan(cameraAngle)
+            #pixelsOffCenterY = pixelsOffCenter(centerYTarget, h)
+            #inchesOffCenterY = pixelsToInches(pixelsOffCenterY, pixelHeight, targetHeight)
+            #dist = (deltaAltitude + inchesOffCenterY) / np.tan(cameraAngle)
             #distZ = estimateDistanceFunction1(tvec[2][0])
             #distY = estimateDistanceFunction2(tvec[1][0])
             #distFt = math.sqrt(distZ ** 2 + distY ** 2)
@@ -611,44 +589,31 @@ while(True):
 
             pixelsOffCenterX = pixelsOffCenter(centerXTarget, w)
             inchesOffCenterX = pixelsToInches(pixelsOffCenterX, pixelHeight, targetHeight)
-            angle = calculateLateralAngle(inchesOffCenterX, dist)
+            #angle = calculateLateralAngle(inchesOffCenterX, dist)
             #angle = arbitrateValue(estimateAngleFunction1(yTheta),estimateAngleFunction2(yTheta))
             #dist = distFt * 12
+            if(pixelHeight != 0):
+                dist = (targetHeight * h * 0.6305) / (2 * pixelHeight * math.tan(0.418224329)) # the angle  is a constant: the tangent of half of the camera's field of view angle.
 
             centerValue = calculateCenter(centerXTarget, cameraWidth)
-
+            centerValue = inchesOffCenterX
 
             # publish
             table.putNumber('distance',dist)
-            table.putNumber('angle',angle)
+            #table.putNumber('angle',angle)
             table.putNumber('center',centerValue)
-            print "topPoints:"
-            print "  a: (" , aTop[0] , ", " , aTop[1] , ")"
-            print "  b: (" , bTop[0] , ", " , bTop[1] , ")"
-            print "  c: (" , cTop[0] , ", " , cTop[1] , ")"
-            print "  d: (" , dTop[0] , ", " , dTop[1] , ")"
-            print "bottomPoints:"
-            print "  a: (" , aBottom[0] , ", " , aBottom[1] , ")"
-            print "  b: (" , bBottom[0] , ", " , bBottom[1] , ")"
-            print "  c: (" , cBottom[0] , ", " , cBottom[1] , ")"
-            print "  d: (" , dBottom[0] , ", " , dBottom[1] , ")"
-            print distance(aTop, aBottom)
-            print distance(bTop, bBottom)
-
-            #print "bottomCenter", centerXBottom, centerYBottom
-            #print "topCenter", centerXTop, centerYTop
 
             print "dist:", dist
-            print "angle:", angle
+            #print "angle:", angle
             print "centerValue:", centerValue
         else:
             table.putNumber('distance',-999)
-            table.putNumber('angle',-999)
+            #table.putNumber('angle',-999)
             table.putNumber('center',-999)
 
     else:
         table.putNumber('distance',-999)
-        table.putNumber('angle',-999)
+        #table.putNumber('angle',-999)
         table.putNumber('center',-999)
 
     cv2.imwrite('frame-out.jpg', frame)
