@@ -51,14 +51,18 @@ gearTargetHeight = 5
 gearTargetDist = 10.25
 gearTargetWidth = 2
 
+# Horizontal distance (inches) between the camera and the center of the robot.
+gearCameraOffset = 9.7
+
+
 # angle function values
 #angleFunc1A = -90.535724570955
 #angleFunc1B = 45.247456281206
 #angleFunc2A = -5.511621418651
 #angleFunc2B = 24.318446167847
 # distance function values
-estimateDistanceSlope = 0.08748759788249
-estimateDistanceIntercept = -0.5189968934245
+estimateDistanceSlope = 0.78818915774652
+estimateDistanceIntercept = 4.637193403987
 #distFunc2A = -0.1414458147376
 #distFunc2B = -0.0675841969269
 
@@ -551,6 +555,7 @@ def boilerLocate(frame):
             if(pixelHeight != 0):
                 dist = (boilerTargetHeight * h) / (2 * pixelHeight * math.tan(0.418224329) * 0.6305) # the angle  is a constant: the tangent of half of the camera's field of view angle.
             angle = math.atan2(inchesOffCenterX , dist)
+            angle = math.degrees(angle)
 
             centerValue = calculateCenter(centerXTarget, cameraWidth)
             centerValue = inchesOffCenterX
@@ -685,13 +690,15 @@ def gearLocate(frame):
                 #pixelsOffCenterY = pixelsOffCenter(centerYTarget, h)
                 #inchesOffCenterY = pixelsToInches(pixelsOffCenterY, pixelDist, targetDist)
                 #dist = (deltaAltitude + inchesOffCenterY) / np.tan(cameraAngle)
-                ratio = (leftPixelHeight * 1.0 / rightPixelHeight * 1.0)
+                #ratio = (leftPixelHeight * 1.0 / rightPixelHeight * 1.0)
                 pixelsOffCenterX = pixelsOffCenter(centerXTarget, w)
                 inchesOffCenterX = pixelsToInches(pixelsOffCenterX, pixelDist, gearTargetDist)
+                inchesOffCenterTargetX = inchesOffCenterTargetX + gearCameraOffset
                 centerValue = inchesOffCenterX
                 if(pixelHeight != 0):
                     dist = (gearTargetHeight * h) / (2 * pixelHeight * math.tan(0.418224329) * 0.6305) # the angle  is a constant: the tangent of half of the camera's field of view angle.
                 angle = math.atan2(inchesOffCenterX , dist)
+                angle = math.degrees(angle)
                 #print "inchesOffCenterX:" , inchesOffCenterX
                 #angle = calculateLateralAngle(inchesOffCenterX, dist)
                 #centerValue = calculateCenter(centerXTarget, cameraWidth) + 1
@@ -731,12 +738,13 @@ def gearLocate(frame):
                 inchesOffCenterTargetX = inchesOffCenterX
                 if (a[1] < b[1]): # should run if the near contour is on the left (of the peg)
                     inchesOffCenterTargetX = inchesOffCenterX - 4.125
-                    ratio = (distance(a,d) * 1.0 / distance(b,c) * 1.0)
+                    #ratio = (distance(a,d) * 1.0 / distance(b,c) * 1.0)
                     #print "Left side of Target"
                 else:
                     inchesOffCenterTargetX = inchesOffCenterX + 4.125
-                    ratio = (distance(b,c) * 1.0 / distance(a,d) * 1.0)
+                    #ratio = (distance(b,c) * 1.0 / distance(a,d) * 1.0)
                     #print "Right side of Target"
+                inchesOffCenterTargetX = inchesOffCenterTargetX + gearCameraOffset
                 centerValue = inchesOffCenterTargetX
                 #pixelsOffCenterY = pixelsOffCenter(centerY, h)
                 #inchesOffCenterY = pixelsToInches(pixelsOffCenterY, pixelWidth, targetWidth)
@@ -747,6 +755,7 @@ def gearLocate(frame):
                 if(pixelWidth != 0):
                     dist = (gearTargetWidth * h) / (2 * pixelWidth * math.tan(0.418224329) * 0.6305) # the angle  is a constant: the tangent of half of the camera's field of view angle.
                 angle = math.atan2(inchesOffCenterTargetX , dist)
+                angle = math.degrees(angle)
                 #centerValue = calculateCenter((cameraWidth / 2) + (inchesOffCenterTargetX / targetWidth), cameraWidth)
     return dist, angle, centerValue
 

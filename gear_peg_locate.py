@@ -46,8 +46,15 @@ gearTargetWidth = 2
 # vertical size (inches) of vision target.
 targetHeight = 5
 
+# Horizontal distance (inches) between the camera and the center of the robot.
+gearCameraOffset = 9.7
+
 # Size from one target to the other, for 2 contour sensing
 targetDist = 10.25
+
+# Constant....
+estimateDistanceSlope = 0.78818915774652
+estimateDistanceIntercept = 4.637193403987
 
 ### END CONSTANTS ###
 ### CALIBRATION ###
@@ -309,8 +316,8 @@ def mat2euler(M, cy_thresh=None):
 def calculateLateralAngle(offCenterX, distance):
     return math.degrees(math.asin(offCenterX / distance))
 
-def estimateDistance(pixelHeight):
-    return (estimateDistanceSlope * pixelHeight) + estimateDistanceIntercept
+def estimateDistance(input):
+    return (estimateDistanceSlope * input) + estimateDistanceIntercept
 
 def calculateDistanceToTarget(inchesOffCenterY):
     return (deltaAltitude + inchesOffCenterY) / np.tan(cameraAngle)
@@ -449,17 +456,21 @@ while(True):
         nearBox = simplifyContour(nearContour)
         cv2.drawContours(frame, [nearContour], -1, (127,127,0),3)
         farBox = simplifyContour(farContour)
-        dist = -777
-        angle = -777
-        centerValue = -777
-        ratio = -777
+        dist = -999
+        angle = -999
+        centerValue = -999
+        #ratio = -777
         #print "Near Contour Area:" , cv2.contourArea(nearContour)
         #print "Far Contour Area:" , cv2.contourArea(farContour)
         #print "Near Box Area:" , cv2.contourArea(nearBox)
         #print "Far Box Area:" , cv2.contourArea(farBox)
+        if(len(nearBox) != 4):
+            nearBox = rotatedBoundingRectangle(nearContour)
+        if(len(farBox) != 4):
+            farBox = rotatedBoundingRectangle(farContour)
 
-        if ((cv2.contourArea(farBox) > cv2.contourArea(nearBox) * 0.75) and (secondLargestAreaIndex != -1)):
-            # if the two contours are within 90% of each other in area, work with both.
+        if ((cv2.contourArea(farBox) > cv2.contourArea(nearBox) * 0.51) and (secondLargestAreaIndex != -1)):
+            # if the two contours are within 51% of each other in area, work with both.
             #print "Using two Contours:"
             #print "Dist:", dist
             # draw it on screen
@@ -513,10 +524,16 @@ while(True):
                 #pixelsOffCenterY = pixelsOffCenter(centerYTarget, h)
                 #inchesOffCenterY = pixelsToInches(pixelsOffCenterY, pixelDist, targetDist)
                 #dist = (deltaAltitude + inchesOffCenterY) / np.tan(cameraAngle)
-                ratio = (leftPixelHeight * 1.0 / rightPixelHeight * 1.0)
+                #ratio = (leftPixelHeight * 1.0 / rightPixelHeight * 1.0)
                 pixelsOffCenterX = pixelsOffCenter(centerXTarget, w)
                 inchesOffCenterX = pixelsToInches(pixelsOffCenterX, pixelDist, targetDist)
+                inchesOffCenterX = inchesOffCenterX + gearCameraOffset
                 centerValue = inchesOffCenterX
+                if(pixelDist != 0):
+                    dist = (targetDist * h) / (2 * pixelDist * math.tan(0.418224329) * 0.6305) # the angle  is a constant: the tangent of half of the camera's field of view angle.
+                    dist = estimateDistance(dist)
+                angle = math.atan2(inchesOffCenterTargetX , dist)
+                angle = math.degrees(angle)
                 #print "inchesOffCenterX:" , inchesOffCenterX
                 #angle = calculateLateralAngle(inchesOffCenterX, dist)
                 #centerValue = calculateCenter(centerXTarget, cameraWidth) + 1
@@ -554,18 +571,21 @@ while(True):
                 pixelsOffCenterX = pixelsOffCenter(centerX, w)
                 inchesOffCenterX = pixelsToInches(pixelsOffCenterX, pixelWidth, targetWidth)
                 inchesOffCenterTargetX = inchesOffCenterX
-                if (a[1] < b[1]): # should run if the near contour is on the left (of the peg)
+                if (a[1] > b[1]): # should run if the near contour is on the left (of the peg)
                     inchesOffCenterTargetX = inchesOffCenterX - 4.125
-                    ratio = (distance(a,d) * 1.0 / distance(b,c) * 1.0)
+                    #ratio = (distance(a,d) * 1.0 / distance(b,c) * 1.0)
                     #print "Left side of Target"
                 else:
                     inchesOffCenterTargetX = inchesOffCenterX + 4.125
-                    ratio = (distance(b,c) * 1.0 / distance(a,d) * 1.0)
+                    #ratio = (distance(b,c) * 1.0 / distance(a,d) * 1.0)
                     #print "Right side of Target"
+                inchesOffCenterTargetX = inchesOffCenterTargetX + gearCameraOffset
                 centerValue = inchesOffCenterTargetX
                 if(pixelWidth != 0):
                     dist = (gearTargetWidth * h) / (2 * pixelWidth * math.tan(0.418224329) * 0.6305) # the angle  is a constant: the tangent of half of the camera's field of view angle.
+                    dist = estimateDistance(dist)
                 angle = math.atan2(inchesOffCenterTargetX , dist)
+                angle = math.degrees(angle)
                 #pixelsOffCenterY = pixelsOffCenter(centerY, h)
                 #inchesOffCenterY = pixelsToInches(pixelsOffCenterY, pixelWidth, targetWidth)
                 #print "pixelsX:", pixelsOffCenterX
@@ -584,10 +604,10 @@ while(True):
 
         #print "dist:", dist
         #print "angle:", angle
-        table.putNumber('gearDistance', gearDist)
-        table.putNumber('gearCV', gearCV)
-        table.putNumber('gearAngle', gearAngle)
-        cv2.imwrite('gear-frame-out.jpg', gearFrame)
+        table.putNumber('gearDistance', dist)
+        table.putNumber('gearCV', centerValue)
+        table.putNumber('gearAngle', angle)
+        cv2.imwrite('gear-frame-out.jpg', frame)
 
     else:
         table.putNumber('gearDistance', -999)

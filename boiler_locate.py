@@ -49,8 +49,8 @@ targetHeight = 6
 #angleFunc2A = -5.511621418651
 #angleFunc2B = 24.318446167847
 # distance function values
-estimateDistanceSlope = 0.08748759788249
-estimateDistanceIntercept = -0.5189968934245
+estimateDistanceSlope = 0.78818915774652
+estimateDistanceIntercept = 4.637193403987
 #distFunc2A = -0.1414458147376
 #distFunc2B = -0.0675841969269
 
@@ -593,28 +593,31 @@ while(True):
             #angle = arbitrateValue(estimateAngleFunction1(yTheta),estimateAngleFunction2(yTheta))
             #dist = distFt * 12
             if(pixelHeight != 0):
-                dist = (targetHeight * h * 0.6305) / (2 * pixelHeight * math.tan(0.418224329)) # the angle  is a constant: the tangent of half of the camera's field of view angle.
-
+                dist = (targetHeight * h) / (2 * pixelHeight * math.tan(0.418224329) * 0.6305) # the angle  is a constant: the tangent of half of the camera's field of view angle.
+            dist = estimateDistance(dist)
             centerValue = calculateCenter(centerXTarget, cameraWidth)
             centerValue = inchesOffCenterX
+            angle = math.atan2(inchesOffCenterX , dist)
+            angle = math.degrees(angle)
+
 
             # publish
-            table.putNumber('distance',dist)
-            #table.putNumber('angle',angle)
-            table.putNumber('center',centerValue)
+            table.putNumber('boilerDistance', dist)
+            table.putNumber('boilerAngle', angle)
+            table.putNumber('boilerCV', centerValue)
 
             print "dist:", dist
-            #print "angle:", angle
+            print "angle:", angle
             print "centerValue:", centerValue
         else:
-            table.putNumber('distance',-999)
-            #table.putNumber('angle',-999)
-            table.putNumber('center',-999)
+            table.putNumber('boilerDistance', -999)
+            table.putNumber('boilerAngle', -999)
+            table.putNumber('boilerCV', -999)
 
     else:
-        table.putNumber('distance',-999)
-        #table.putNumber('angle',-999)
-        table.putNumber('center',-999)
+        table.putNumber('boilerDistance', -999)
+        table.putNumber('boilerAngle', -999)
+        table.putNumber('boilerCV', -999)
 
     cv2.imwrite('frame-out.jpg', frame)
 
