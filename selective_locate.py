@@ -54,6 +54,7 @@ gearTargetWidth = 2
 # Horizontal distance (inches) between the camera and the center of the robot.
 gearCameraOffset = 9.7
 
+
 # angle function values
 #angleFunc1A = -90.535724570955
 #angleFunc1B = 45.247456281206
@@ -762,9 +763,10 @@ def gearLocate(frame):
 
 # instantiate the video capture object
 #cap = cv2.VideoCapture(countCameras())
+
 # get the width and height
-w = 320
-h = 366
+w = 640
+h = 480 - 114
 
 # set the window as a named window so the click function can be bound
 # cv2.namedWindow("frame")
@@ -777,31 +779,12 @@ h = 366
 print "Location program started..."
 print "Good luck on your Mission!"
 
-directory = "calibration-images"
+
 t = 0
-cap0 = cv2.VideoCapture(0) # video from device video0.
-cap0.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, 320)
-cap0.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, 240)
-
-gearCap = cap0 #create variables to avoid potential scope issues.
-boilerCap = cap0
-print "cam 0 brightness", cap0.get(cv2.cv.CV_CAP_PROP_BRIGHTNESS)
-#gearCap.set(5, 10)
-cap1 = cv2.VideoCapture(1)
-cap1.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, 320)
-cap1.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, 240)
-print "cam 1 brightness", cap1.get(cv2.cv.CV_CAP_PROP_BRIGHTNESS)
-if (cap0.get(cv2.cv.CV_CAP_PROP_BRIGHTNESS) =< 0) { #boiler camera should have a brightness value of -.1, the gear camera has around .4577
-    boilerCap = cap0
-    gearCap = cap1
-} else {
-    boilerCap = cap1
-    gearCap = cap0
-}
-#boilerCap.set(5, 10)
-#print "gearFPS:", gearCap.get(cv2.cv.CV_CAP_PROP_FPS)
-#print "boilerFPS:", boilerCap.get(5)
-
+directory = "calibration-images"
+previousCamera = "gear"
+gearCap = cv2.VideoCapture(0)
+boilerCap = gearCap
 # infinite loop until brokwnk
 while(True):
     # set exposure
@@ -811,19 +794,20 @@ while(True):
     #print "Contrast:", cap.get(11)
     #print "Gain:", cap.get(14)
 
-    # capture each frame
-
-
     # flip the frame (optional)
     #frame = cv2.flip(frame,1)
     #frame = cv2.flip(frame,0)
     t += 1
-    if(t % 2 == 0):
-        #if(t == 2):
-            #gearCap.set(5, 10)
-            #print "gearFPS:", gearCap.get(cv2.cv.CV_CAP_PROP_FPS)
+
+    if (table.getString("whichCamera") == "gear"):
+        if (previousCamera == "boiler"):
+            boilerCap.release()
+            gearCap = cv2.VideoCapture(0)
+            previousCamera = "gear"
+
+        #print "gearFPS:", gearCap.get(cv2.cv.CV_CAP_PROP_FPS)
         gearRet, gearFrame = gearCap.read()
-        gearFrame = gearFrame[57:240, 0:320]
+        gearFrame = gearFrame[114:480, 0:640]
         gearDist, gearAngle, gearCV = gearLocate(gearFrame)
         print "gearDist:", gearDist
         print "gearAngle:", gearAngle
@@ -832,19 +816,21 @@ while(True):
         table.putNumber('gearCV', gearCV)
         table.putNumber('gearAngle', gearAngle)
         cv2.imwrite('gear-frame-out.jpg', gearFrame)
-        if (t % 60 == 0):
+        if (t % 20 == 0):
             filename = "0" * (5 - len(str(t))) + str(t)
             filename = directory+"/"+"gear"+"/"+filename+".jpg"
             logfile.write("Writing %s"%(filename))
             cv2.imwrite(filename, gearFrame)
             logfile.write("Complete")
-    else:
-        #if (t == 1):
-            #boilerCap.set(5, 10)
-            #print "boilerFPS:", boilerCap.get(5)
-        boilerCap = cv2.VideoCapture(1)
+
+    if (table.getString("whichCamera") == "boiler"):
+        if (previousCamera == "gear"):
+            gearCap.release()
+            boilerCap = cv2.VideoCapture(1)
+            previousCamera = "boiler"
+        #print "boilerFPS:", boilerCap.get(5)
         boilerRet, boilerFrame = boilerCap.read()
-        boilerFrame = boilerFrame[57:240, 0:320]
+        boilerFrame = boilerFrame[114:480, 0:640]
         boilerDist, boilerAngle, boilerCV = boilerLocate(boilerFrame)
         table.putNumber('boilerDistance', boilerDist)
         table.putNumber('boilerAngle', boilerAngle)
@@ -853,12 +839,9 @@ while(True):
         print "boilerAngle:", boilerAngle
         print "boilerCV:", boilerCV
         cv2.imwrite('boiler-frame-out.jpg', boilerFrame)
-        if (t % 60 == 1):
+        if (t % 20 == 0):
             filename = "0" * (5 - len(str(t))) + str(t)
             filename = directory+"/"+"boiler"+"/"+filename+".jpg"
             logfile.write("Writing %s"%(filename))
             cv2.imwrite(filename, boilerFrame)
             logfile.write("Complete")
-
-gearCap.release()
-boilerCap.release()
