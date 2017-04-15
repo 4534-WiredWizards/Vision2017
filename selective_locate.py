@@ -766,7 +766,7 @@ def gearLocate(frame):
 
 # get the width and height
 w = 640
-h = 480 - 114
+h = 366 # 480 - 114, frame size is altered by frame = frame[114:480, 0:640]
 
 # set the window as a named window so the click function can be bound
 # cv2.namedWindow("frame")
@@ -845,3 +845,7 @@ while(True):
             logfile.write("Writing %s"%(filename))
             cv2.imwrite(filename, boilerFrame)
             logfile.write("Complete")
+
+#release captures after end of everything.
+gearCap.release()
+boilerCap.release()

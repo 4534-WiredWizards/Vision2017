@@ -764,7 +764,7 @@ def gearLocate(frame):
 #cap = cv2.VideoCapture(countCameras())
 # get the width and height
 w = 320
-h = 366
+h = 183 # 240 - 57, uses only a portion of the frame
 
 # set the window as a named window so the click function can be bound
 # cv2.namedWindow("frame")
@@ -832,7 +832,7 @@ while(True):
         table.putNumber('gearCV', gearCV)
         table.putNumber('gearAngle', gearAngle)
         cv2.imwrite('gear-frame-out.jpg', gearFrame)
-        if (t % 60 == 0):
+        if (t % 20 == 0):
             filename = "0" * (5 - len(str(t))) + str(t)
             filename = directory+"/"+"gear"+"/"+filename+".jpg"
             logfile.write("Writing %s"%(filename))
@@ -853,12 +853,13 @@ while(True):
         print "boilerAngle:", boilerAngle
         print "boilerCV:", boilerCV
         cv2.imwrite('boiler-frame-out.jpg', boilerFrame)
-        if (t % 60 == 1):
+        if (t % 20 == 1):
             filename = "0" * (5 - len(str(t))) + str(t)
             filename = directory+"/"+"boiler"+"/"+filename+".jpg"
             logfile.write("Writing %s"%(filename))
             cv2.imwrite(filename, boilerFrame)
             logfile.write("Complete")
 
+#release captures after end of everything.
 gearCap.release()
 boilerCap.release()
